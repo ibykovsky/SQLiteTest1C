@@ -1,0 +1,245 @@
+﻿
+&НаСервере
+Процедура ВыполнитьНаСервере()
+	// Вставить содержимое обработчика.
+	
+	ФайлБД = "C:\Users\igor.bikovskiy\Documents\sqllite_log.db";
+	SQLite = SQLiteInit(ФайлБД);
+	Result = SQLite.Execute("select * from Events");
+	
+    Пока НЕ Result.EOF Цикл
+        rowID = Result.Fields(0).value;
+        dateTime = Result.Fields(1).value;
+        dateTimePresentation = Result.Fields(1).value;
+        Сообщить("rowID: " + rowID + "; dateTime: " + dateTime + "; dateTimePresentation: " + dateTimePresentation);
+        Result.MoveNext();
+	КонецЦикла;	
+	
+	Result = SQLite.Execute("INSERT INTO Events (dateTime,dateTimePresentation) VALUES (strftime('%s', 'now'),datetime('now'))");
+	
+	
+	Сообщить("///////////////////////////////////////////////////////////////////////////////////////");
+	
+	ФайлБД = "C:\Users\igor.bikovskiy\Documents\sqllite_log2.db";
+	
+	SQLite2 = SQLiteInit(ФайлБД);
+	//СоздатьТаблицыВНовойБазе(SQLite2);
+	
+	ВыборкаПользователи = Справочники.Пользователи.Выбрать();
+	Пока ВыборкаПользователи.Следующий() Цикл
+		Сообщить(Строка(ВыборкаПользователи.Ссылка.УникальныйИдентификатор()) + " - " + ВыборкаПользователи);
+		ДобавитьПользователя(SQLite2,Строка(ВыборкаПользователи.Ссылка.УникальныйИдентификатор()),ВыборкаПользователи.Наименование,ВыборкаПользователи.Код);
+	КонецЦикла;
+	
+	Result = SQLite2.Execute("select * from Events");
+	
+    Пока НЕ Result.EOF Цикл
+        rowID = Result.Fields(0).value;
+        dateTime = Result.Fields(1).value;
+        dateTimePresentation = Result.Fields(1).value;
+        Сообщить("rowID: " + rowID + "; dateTime: " + dateTime + "; dateTimePresentation: " + dateTimePresentation);
+        Result.MoveNext();
+	КонецЦикла;
+	
+	Result = SQLite2.Execute("INSERT INTO Events (dateTime,dateTimePresentation) VALUES (strftime('%s', 'now'),datetime('now'))");	
+	
+КонецПроцедуры
+
+&НаКлиенте
+Процедура Осуществить(Команда)
+	ВыполнитьНаСервере();
+КонецПроцедуры
+
+//////////////////////////////////////////////////
+//
+//
+//
+//
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+Функция ДобавитьВидСобытия(SQLiteBase,ИмяСобытия)
+	
+	Result = SQLiteBase.Execute("SELECT * EventsTypes WHERE name='" + ИмяСобытия + "'");
+	Если Result.EOF Тогда
+		Result = SQLiteBase.Execute("INSERT INTO EventsTypes (name) VALUES('" + ИмяСобытия + "')");
+	КонецЕсли;
+	
+КонецФункции
+
+/////////////////////////////////////////////////////////////////////////
+// Таблица "Пользователи"
+//
+Функция ДобавитьПользователя(SQLiteBase,uuid,ИмяПользователя,code)
+	
+	ДобавитьПользователяКакСтруктуру(SQLiteBase,Новый Структура("uuid,name,code",uuid,ИмяПользователя,code));
+	
+КонецФункции
+
+Функция ДобавитьПользователяКакСтруктуру(SQLiteBase,СтруктураПользователя)
+	
+	Result = SQLiteBase.Execute(SELECT("Users",СтруктураПользователя,"uuid",СтруктураПользователя.uuid));
+	
+	Если Result.EOF Тогда
+		Result = SQLiteBase.Execute(INSERT_USER(СтруктураПользователя));
+	КонецЕсли;
+	
+КонецФункции
+
+Функция INSERT_USER(СтруктураДанных)
+	Возврат INSERT("Users",СтруктураДанных);
+КонецФункции
+
+//Функция ДобавитьВидСобытия(ИмяСобытия)               
+//КонецФункции
+
+//Функция ДобавитьВидСобытия(ИмяСобытия)
+//КонецФункции
+
+Функция INSERT(ИмяТаблицы,СтруктураДанных)
+	Возврат "INSERT INTO " + ИмяТаблицы + VALUES_CLAUSE(СтруктураДанных);
+КонецФункции
+
+Функция SELECT(ИмяТаблицы,СтруктураКолонок,КолонкаОтборИмя,КолонкаОтборЗначение)
+	
+	Результат = "SELECT " + COLUMNS_CLAUSE(СтруктураКолонок) + " FROM " + ИмяТаблицы + " WHERE " + КолонкаОтборИмя + " = ";
+	Если ТипЗнч(КолонкаОтборЗначение)=Тип("Число") Тогда
+		Возврат Результат + Строка(КолонкаОтборЗначение);
+	Иначе
+		Возврат Результат + "'" + Строка(КолонкаОтборЗначение) + "'";
+	КонецЕсли;
+	
+КонецФункции
+
+Функция COLUMNS_CLAUSE(СтруктураДанных)
+	
+	Колонки = "";
+	
+	Для Каждого ЭлементСтруктуры Из СтруктураДанных Цикл
+		Колонки = Колонки + ЭлементСтруктуры.Ключ + ",";
+	КонецЦикла;
+	
+	Возврат Сред(Колонки,1,СтрДлина(Колонки)-1);
+	
+КонецФункции
+
+Функция VALUES_CLAUSE(СтруктураДанных)
+	
+	Колонки = " (";
+	Значения = " VALUES(";
+	
+	Для Каждого ЭлементСтруктуры Из СтруктураДанных Цикл
+		Колонки = Колонки + ЭлементСтруктуры.Ключ + ",";
+		Значения = Значения + ЗначениеВСтроку(ЭлементСтруктуры.Значение) + ",";
+	КонецЦикла;
+	
+	Колонки =	Сред(Колонки ,1,СтрДлина(Колонки )-1)  + ")";
+	Значения =	Сред(Значения,1,СтрДлина(Значения)-1)  + ")";
+	
+	Возврат Колонки + Значения;
+	
+КонецФункции
+
+Функция ЗначениеВСтроку(Значение)
+	
+	Если ТипЗнч(Значение) = Тип("Число") Тогда
+		Возврат Значение;
+	Иначе
+		Возврат "'" + СокрЛП(Строка(Значение)) + "'";
+	КонецЕсли;
+	
+КонецФункции
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+Процедура СоздатьТаблицыВНовойБазе(SQLiteBase )
+	
+	Result = SQLiteBase.Execute(ТаблицаEvents());
+	Result = SQLiteBase.Execute(ТаблицаDataPackage());
+	Result = SQLiteBase.Execute(ТаблицаEventsTypes());
+	Result = SQLiteBase.Execute(ТаблицаUsers());
+	
+КонецПроцедуры
+
+Функция ТаблицаEvents()
+	
+	ТекстЗапроса = 
+	"CREATE TABLE ""Events"" (
+	|""rowId""	INTEGER NOT NULL UNIQUE,
+	|""dateTime""	INTEGER NOT NULL,
+	|""dateTimePresentation""	TEXT NOT NULL,
+	|""eventType""	INTEGER DEFAULT -1,
+	|PRIMARY KEY(""rowId"")
+	|)";
+	
+	Возврат ТекстЗапроса;
+	
+КонецФункции
+
+Функция ТаблицаDataPackage()
+	
+	ТекстЗапроса = 
+	"CREATE TABLE ""DataPackage"" (
+	|""rowId""	INTEGER NOT NULL UNIQUE,
+	|""creatorId""	INTEGER NOT NULL,
+	|""createEventId""	INTEGER NOT NULL,
+	|""data""	BLOB NOT NULL,
+	|""comment""	TEXT,
+	|PRIMARY KEY(""rowId"" AUTOINCREMENT)
+	|)";
+	
+	Возврат ТекстЗапроса;
+	
+КонецФункции
+
+Функция ТаблицаEventsTypes()
+	
+	ТекстЗапроса = 
+	"CREATE TABLE ""EventsTypes"" (
+	|""Name""	TEXT NOT NULL UNIQUE,
+	|PRIMARY KEY(""Name"")
+	|)";
+	
+	Возврат ТекстЗапроса;
+	
+КонецФункции
+
+Функция ТаблицаUsers()
+	
+	ТекстЗапроса = 
+	"CREATE TABLE ""Users"" (
+	|""uuid""	TEXT NOT NULL,
+	|""name""	TEXT,
+	|""code""	TEXT,
+	|PRIMARY KEY(""uuid"")
+	|)";
+
+	Возврат ТекстЗапроса;
+	
+КонецФункции
+
+//////////////////////////////////////////////////
+//
+//
+//
+//
+
+Функция SQLiteInit(ФайлБД) Экспорт
+    SQLiteObject = Новый COMОбъект("ADODB.Connection");
+    SQLiteConnectionString = "DRIVER=SQLite3 ODBC Driver;Database=" + ФайлБД + ";";
+	SQLiteObject.Open(SQLiteConnectionString);
+    Возврат SQLiteObject;
+КонецФункции
+
+Функция SQLiteQuery(SQLiteObject,Запрос) Экспорт
+    SQLiteRS = Новый COMОбъект("ADODB.Recordset");
+    Попытка
+        SQLiteRS = SQLiteObject.Execute(Запрос);
+    Исключение
+        Сообщить("Невозможно выполнить SQL запрос " + ОписаниеОшибки(), СтатусСообщения.Важное);
+        Возврат Ложь;
+    КонецПопытки;
+    
+    Возврат SQLiteRS;
+КонецФункции
